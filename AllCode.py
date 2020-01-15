@@ -1,5 +1,5 @@
-import twtd_invoker # twtd_invoker を読み込む
-
+import twtd_invoker 
+import requests, bs4
 from gensim.models import word2vec
 import MeCab
 import sys
@@ -8,23 +8,96 @@ import random
 from collections import Counter
 
 ##########ここから翻訳するやつ##########
-def Translate(Jlist): # 「単語」と「意味」を翻訳する関数（変数はlist型[str(word), str(mean)]）
-    lanlist = ['zh-CN', 'ko', 'vi', 'es', 'id', 'en'] # 順に「中国語」, 「韓国語」, 「ベトナム語」, 「スペイン語」, 「インドネシア語」, 「英語」に翻訳
-    anslist = [] # 翻訳結果をいれるリスト
-    anslist.append(Jlist) # はじめに日本語の「単語」と「意味」のセットを入れておく
-    word = Jlist[0] # 変数のリストの「単語」を word に代入
-    mean = Jlist[1] # 変数のリストの「意味」を mean に代入
+def Translate(word,Jlist): # 「単語」と「意味」を翻訳する関数
+	lanlist = ['zh-CN', 'ko', 'vi', 'es', 'id', 'en',"ru","hi"] # 順に「中国語」, 「韓国語」, 「ベトナム語」, 「スペイン語」, 「インドネシア語」, 「英語」, 「ロシア語」, 「ヒンディー語」に翻訳
+	anslist = [] # 翻訳結果をいれるリスト
+	for i in range(len(lanlist)):#リストを用意
+		anslist.append([])
+	#anslist[0].append(word) # はじめに日本語の「単語」と「意味」のセットを入れておく
+	#anslist[1].append(Jlist)
 
-    for i in lanlist: # 言語を
-        ans_w = twtd_invoker.twtd_client.translate('ja', i, word, twtd_invoker.tArray, 'en') # word を i に代入された言語に翻訳
-        ans_m = twtd_invoker.twtd_client.translate('ja', i, mean, twtd_invoker.tArray, 'en') # mean を i に代入された言語に翻訳
-        anslist.append([ans_w, ans_m]) # ans_w とans_m をリストでセットにし, anslist に追加
+	x = word[0]
+	list1 = [["中国語", "null"], ["韓国語", "null"], ["ベトナム語", "null"], ["スペイン語", "null"], ["インドネシア語", "null"], ["英語", "null"],["ロシア語","null"],["ヒンディー語","null"]]
+	url = "https://ja.wikipedia.org/wiki/" + str(x)
+	res = requests.get(url)
+	soup = bs4.BeautifulSoup(res.text, "html.parser")
+	mw = soup.find("div", id="p-lang")
+	s = mw.find("div", class_="body")
+	a = s.find_all("a")
 
-    return anslist # 翻訳後の結果を返す
+	for i in range(len(a)-1):
+		list2 = a[i].get("title").split(": ") # ["言語", "その言語での言い方"]
+
+		for j in range(len(list1)):
+			if list1[j][0] == list2[0]:
+				list1[j][1] = list2[1]
+
+
+	for i in range(len(list1)):#wikipediaで調べた時に出てこなかった場合の処理、言語グリッドに翻訳してもらう
+		if list1[i][1] == "null":
+			 list1[i][1] = twtd_invoker.twtd_client.translate('ja', lanlist[i], x, twtd_invoker.tArray, 'en')
+	for i in range(len(list1)):
+		anslist[i].append(list1[i][1])
+			 
+			 
+	mean = Jlist[0] # 変数のリストの「意味」を mean に代入
+
+	for i in range(len(lanlist)): # 言語を
+		ans_m = twtd_invoker.twtd_client.translate('ja', lanlist[i], mean, twtd_invoker.tArray, 'en') # mean を i に代入された言語に翻訳
+		ans_m = str(ans_m) 
+		anslist[i].append(ans_m) # ans_w とans_m をリストでセットにし, anslist に追加
+		
+	jpn = []#0番目に日本語を入れる
+	jpn.append(word)
+	jpn.append(Jlist)
+	anslist.insert(0,jpn)
+		
+		
+	return anslist # 翻訳後の結果を返す
+
+	#for i in list1:
+	#	print(i)
+	
+		
+
 
 # 確認用
 #l = ["好き","嫌いです。しかし、大好きです。"]
 #print(Translate(l))
+
+
+
+
+############################wikipedia通して単語を翻訳######################
+def Wiki(word):
+    list1 = [["中国語", "null"], ["韓国語", "null"], ["ベトナム語", "null"], ["スペイン語", "null"], ["インドネシア語", "null"], ["英語", "null"]]
+    url = "https://ja.wikipedia.org/wiki/" + str(word)
+    res = requests.get(url)
+    soup = bs4.BeautifulSoup(res.text, "html.parser")
+    mw = soup.find("div", id="p-lang")
+    s = mw.find("div", class_="body")
+    a = s.find_all("a")
+
+    for i in range(len(a)-1):
+        list2 = a[i].get("title").split(": ") # ["言語", "その言語での言い方"]
+
+        #if "(" and ")" in list2[1]:
+            #list2[1][list2.index("(") : list2.index(")")] = list2[1][""]
+
+        #else:
+            #pass
+
+        for j in range(len(list1)):
+
+            if list1[j][0] == list2[0]:
+                list1[j][1] = list2[1]
+
+            else:
+                pass
+
+    for i in list1:
+        print(i)
+
 ##########ここまで翻訳するやつ##########
 
 
@@ -55,7 +128,8 @@ def WrongWord(Question):
 
 #s = input()#テスト
 #print(WrongWord(s))#テスト
-##########ここまで呉回答出すやつ	##########
+
+##########ここまで誤回答の候補を出すやつ	##########
 
 
 ##########ここから問題と類似する単語渡された単語からを見つけて返すやつ##########
@@ -116,5 +190,5 @@ def WrongWord2(Question,AllWord):
 	except:
 		print(random.sample(AllWord, 3))
 
-
+##########ここまで問題と類似する単語渡された単語からを見つけて返すやつ##########
 
